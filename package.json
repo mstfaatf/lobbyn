@@ -1,5 +1,8 @@
 {
   "name": "lobbyn",
+  "pnpm": {
+    "onlyBuiltDependencies": ["argon2"]
+  },
   "private": true,
   "scripts": {
     "dev:api": "pnpm --filter @lobbyn/api dev",

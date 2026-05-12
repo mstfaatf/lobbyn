@@ -2,11 +2,9 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
-import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import { db } from './db/client.js';
-import { redis } from './redis/client.js';
+import authRoutes from './routes/auth/index.js';
 
 function createLogger() {
   if (process.env.NODE_ENV === 'production') {
@@ -38,30 +36,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   await app.register(sensible);
 
+  await app.register(authRoutes);
+
   app.get('/health', async () => ({
     status: 'ok',
     timestamp: new Date().toISOString(),
   }));
-
-  app.get('/db-ping', async (_request, reply) => {
-    try {
-      await db.execute(sql`SELECT 1`);
-      return { ok: true, database: 'up' as const };
-    } catch (err) {
-      void reply.code(503);
-      return {
-        ok: false,
-        database: 'down' as const,
-        error: err instanceof Error ? err.message : 'unknown error',
-      };
-    }
-  });
-
-  app.get('/redis-ping', async () => {
-    await redis.set('ping', 'pong');
-    const result = await redis.get('ping');
-    return { pong: result };
-  });
 
   return app;
 }
