@@ -127,8 +127,7 @@ const loginAuthRoutes: FastifyPluginAsync = async (fastify) => {
           orgId,
         },
       });
-    } catch (err) {
-      fastify.log.error({ err }, "login failed");
+    } catch (error) {
       return reply.status(500).send({ message: "Login failed" });
     }
   });
