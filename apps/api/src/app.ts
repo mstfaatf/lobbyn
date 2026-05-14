@@ -5,6 +5,9 @@ import sensible from '@fastify/sensible';
 import Fastify, { type FastifyInstance } from 'fastify';
 
 import authRoutes from './routes/auth/index.js';
+import feedRoutes from './routes/feed/index.js';
+import marketplaceRoutes from './routes/marketplace/index.js';
+import ticketsRoutes from './routes/tickets/index.js';
 
 function createLogger() {
   if (process.env.NODE_ENV === 'production') {
@@ -37,6 +40,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(sensible);
 
   await app.register(authRoutes);
+  await app.register(feedRoutes);
+  await app.register(marketplaceRoutes);
+  await app.register(ticketsRoutes);
 
   app.get('/health', async () => ({
     status: 'ok',
