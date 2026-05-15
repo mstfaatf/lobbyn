@@ -7,6 +7,7 @@ import { listings } from "../../db/schema/marketplace.js";
 import { auditLogs } from "../../db/schema/system.js";
 import { users } from "../../db/schema/users.js";
 import { createError } from "../../lib/errors.js";
+import { deleteObject, getObjectKey } from "../../lib/media.js";
 import {
   buildPaginatedResponse,
   decodeCursor,
@@ -508,10 +509,17 @@ const marketplaceListingsRoutes: FastifyPluginAsync = async (fastify) => {
             eq(listings.isDeleted, false),
           ),
         )
-        .returning({ id: listings.id });
+        .returning({ id: listings.id, imageUrls: listings.imageUrls });
 
       if (deleted === undefined) {
         return createError(reply, 404, "Listing not found");
+      }
+
+      const imageUrls = deleted.imageUrls ?? [];
+      if (imageUrls.length > 0) {
+        for (const url of imageUrls) {
+          await deleteObject(getObjectKey(url));
+        }
       }
 
       await db.insert(auditLogs).values({

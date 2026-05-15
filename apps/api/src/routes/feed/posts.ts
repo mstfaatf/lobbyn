@@ -7,6 +7,7 @@ import { comments, posts, reactions } from "../../db/schema/feed.js";
 import { auditLogs } from "../../db/schema/system.js";
 import { users } from "../../db/schema/users.js";
 import { createError } from "../../lib/errors.js";
+import { deleteObject, getObjectKey } from "../../lib/media.js";
 import {
   buildPaginatedResponse,
   decodeCursor,
@@ -683,10 +684,17 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
             eq(posts.isDeleted, false),
           ),
         )
-        .returning({ id: posts.id });
+        .returning({ id: posts.id, imageUrls: posts.imageUrls });
 
       if (updated === undefined) {
         return createError(reply, 404, "Post not found");
+      }
+
+      const imageUrls = updated.imageUrls ?? [];
+      if (imageUrls.length > 0) {
+        for (const url of imageUrls) {
+          await deleteObject(getObjectKey(url));
+        }
       }
 
       await db.insert(auditLogs).values({

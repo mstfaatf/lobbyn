@@ -2,6 +2,7 @@ import 'dotenv/config';
 
 import './db/client.js';
 import './redis/client.js';
+import './lib/r2.js';
 
 import { buildApp } from './app.js';
 
