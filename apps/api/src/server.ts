@@ -5,6 +5,13 @@ import './redis/client.js';
 import './lib/r2.js';
 
 import { buildApp } from './app.js';
+import {
+  cleanNotificationsWorker,
+  expireListingsWorker,
+  scheduleCronJobs,
+} from './jobs/workers/cron-worker.js';
+import { notificationWorker } from './jobs/workers/notification-worker.js';
+import { pushWorker } from './jobs/workers/push-worker.js';
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -17,8 +24,15 @@ async function main(): Promise<void> {
 
   app.log.info(`Server running on port ${port}`);
 
+  await scheduleCronJobs();
+  console.log('[server] BullMQ workers started');
+
   const shutdown = async (signal: NodeJS.Signals) => {
     app.log.info({ signal }, 'shutdown initiated');
+    await notificationWorker.close();
+    await pushWorker.close();
+    await expireListingsWorker.close();
+    await cleanNotificationsWorker.close();
     await app.close();
     process.exit(0);
   };

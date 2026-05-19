@@ -5,7 +5,9 @@ import { z } from "zod";
 import { db } from "../../db/client.js";
 import { comments, posts, reactions } from "../../db/schema/feed.js";
 import { auditLogs } from "../../db/schema/system.js";
+import { userBuildingMemberships } from "../../db/schema/index.js";
 import { users } from "../../db/schema/users.js";
+import { dispatchNotification } from "../../jobs/dispatch-notification.js";
 import { createError } from "../../lib/errors.js";
 import { deleteObject, getObjectKey } from "../../lib/media.js";
 import {
@@ -256,6 +258,35 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
       metadata: { category: body.category },
     });
 
+    if (body.category === "announcement") {
+      const members = await db
+        .select({ userId: userBuildingMemberships.userId })
+        .from(userBuildingMemberships)
+        .where(
+          and(
+            eq(userBuildingMemberships.buildingId, request.user.buildingId),
+            eq(userBuildingMemberships.isActive, true),
+          ),
+        );
+
+      await Promise.all(
+        members
+          .filter((m) => m.userId !== request.user.id)
+          .map((m) =>
+            dispatchNotification({
+              userId: m.userId,
+              buildingId: request.user.buildingId,
+              orgId: request.user.orgId,
+              type: "announcement",
+              title: "New Announcement",
+              body: inserted.title ?? "",
+              resourceType: "post",
+              resourceId: inserted.id,
+            }),
+          ),
+      );
+    }
+
     const [author] = await db
       .select({
         id: users.id,
@@ -412,10 +443,11 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ errors: parsed.error.flatten() });
       }
 
-      const [postForComment] = await db
+      const [existingPost] = await db
         .select({
           id: posts.id,
           buildingId: posts.buildingId,
+          authorId: posts.authorId,
           isLocked: posts.isLocked,
           isDeleted: posts.isDeleted,
         })
@@ -425,15 +457,15 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         )
         .limit(1);
 
-      if (postForComment === undefined) {
+      if (existingPost === undefined) {
         return createError(reply, 404, "Post not found");
       }
 
-      if (postForComment.isDeleted) {
+      if (existingPost.isDeleted) {
         return createError(reply, 404, "Post not found");
       }
 
-      if (postForComment.isLocked) {
+      if (existingPost.isLocked) {
         return createError(reply, 403, "This post has been locked");
       }
 
@@ -441,7 +473,7 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         .insert(comments)
         .values({
           postId,
-          buildingId: postForComment.buildingId,
+          buildingId: existingPost.buildingId,
           authorId: request.user.id,
           content: parsed.data.content,
         })
@@ -461,6 +493,19 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         resourceId: insertedComment.id,
         metadata: { postId },
       });
+
+      if (existingPost.authorId !== request.user.id) {
+        await dispatchNotification({
+          userId: existingPost.authorId,
+          buildingId: request.user.buildingId,
+          orgId: request.user.orgId,
+          type: "comment",
+          title: "New Comment",
+          body: `${request.user.email} commented on your post`,
+          resourceType: "post",
+          resourceId: postId,
+        });
+      }
 
       const [author] = await db
         .select({

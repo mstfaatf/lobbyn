@@ -1,7 +1,7 @@
 {
   "name": "lobbyn",
   "pnpm": {
-    "onlyBuiltDependencies": ["argon2"]
+    "onlyBuiltDependencies": ["argon2", "msgpackr-extract"]
   },
   "private": true,
   "scripts": {

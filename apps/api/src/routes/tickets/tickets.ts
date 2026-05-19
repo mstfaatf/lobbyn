@@ -6,6 +6,7 @@ import { db } from "../../db/client.js";
 import { ticketUpdates, tickets } from "../../db/schema/tickets.js";
 import { auditLogs } from "../../db/schema/system.js";
 import { users } from "../../db/schema/users.js";
+import { dispatchNotification } from "../../jobs/dispatch-notification.js";
 import { createError } from "../../lib/errors.js";
 import {
   buildPaginatedResponse,
@@ -275,11 +276,12 @@ const ticketRoutes: FastifyPluginAsync = async (fastify) => {
 
       const body = parsed.data;
 
-      const [ticket] = await db
+      const [existingTicket] = await db
         .select({
           id: tickets.id,
           status: tickets.status,
           buildingId: tickets.buildingId,
+          submittedBy: tickets.submittedBy,
         })
         .from(tickets)
         .where(
@@ -290,15 +292,15 @@ const ticketRoutes: FastifyPluginAsync = async (fastify) => {
         )
         .limit(1);
 
-      if (ticket === undefined) {
+      if (existingTicket === undefined) {
         return createError(reply, 404, "Ticket not found");
       }
 
-      if (!isValidStatusTransition(ticket.status, body.status)) {
+      if (!isValidStatusTransition(existingTicket.status, body.status)) {
         return createError(
           reply,
           400,
-          `Invalid status transition from ${ticket.status} to ${body.status}`,
+          `Invalid status transition from ${existingTicket.status} to ${body.status}`,
         );
       }
 
@@ -318,7 +320,7 @@ const ticketRoutes: FastifyPluginAsync = async (fastify) => {
       await db.insert(ticketUpdates).values({
         ticketId,
         authorId: request.user.id,
-        oldStatus: ticket.status,
+        oldStatus: existingTicket.status,
         newStatus: body.status,
         message: body.message,
       });
@@ -330,8 +332,21 @@ const ticketRoutes: FastifyPluginAsync = async (fastify) => {
         action: "ticket.status_update",
         resourceType: "ticket",
         resourceId: ticketId,
-        metadata: { from: ticket.status, to: body.status },
+        metadata: { from: existingTicket.status, to: body.status },
       });
+
+      if (existingTicket.submittedBy !== request.user.id) {
+        await dispatchNotification({
+          userId: existingTicket.submittedBy,
+          buildingId: request.user.buildingId,
+          orgId: request.user.orgId,
+          type: "ticket_update",
+          title: "Ticket Update",
+          body: `Your ticket status changed to ${body.status}`,
+          resourceType: "ticket",
+          resourceId: ticketId,
+        });
+      }
 
       const updateRows = await db
         .select({
