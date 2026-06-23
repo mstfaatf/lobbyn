@@ -11,6 +11,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
+
 import { buildings, organizations } from './organizations.js';
 import { users } from './users.js';
 
@@ -106,3 +107,28 @@ export type BuildingInviteCode = InferSelectModel<typeof buildingInviteCodes>;
 export type NewBuildingInviteCode = InferInsertModel<typeof buildingInviteCodes>;
 export type AuditLog = InferSelectModel<typeof auditLogs>;
 export type NewAuditLog = InferInsertModel<typeof auditLogs>;
+
+export const userPreferences = pgTable(
+  'user_preferences',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    notifyAnnouncements: boolean('notify_announcements').notNull().default(true),
+    notifyComments: boolean('notify_comments').notNull().default(true),
+    notifyTickets: boolean('notify_tickets').notNull().default(true),
+    notifyMarketplace: boolean('notify_marketplace').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('user_preferences_user_id_idx').on(table.userId)],
+);
+
+export type UserPreferences = InferSelectModel<typeof userPreferences>;
+export type NewUserPreferences = InferInsertModel<typeof userPreferences>;

@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import rateLimit from "@fastify/rate-limit";
 import { eq } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
@@ -6,6 +8,7 @@ import { z } from "zod";
 import { hashPassword } from "../../auth/password.js";
 import { db } from "../../db/client.js";
 import { users } from "../../db/schema/users.js";
+import { sendVerificationEmail } from "../../lib/email.js";
 
 const registerBodySchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email()),
@@ -58,6 +61,27 @@ const registerAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (inserted === undefined) {
         throw new Error("Insert returned no row");
+      }
+
+      const verifyToken = randomBytes(32).toString("hex");
+      const verifyTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await db
+        .update(users)
+        .set({
+          emailVerifyToken: verifyToken,
+          emailVerifyTokenExpiresAt: verifyTokenExpiresAt,
+        })
+        .where(eq(users.id, inserted.id));
+
+      try {
+        await sendVerificationEmail({
+          to: inserted.email,
+          displayName: fullName,
+          verifyUrl: `${process.env.API_BASE_URL}/v1/auth/verify-email?token=${verifyToken}&userId=${inserted.id}`,
+        });
+      } catch (emailErr) {
+        fastify.log.error({ err: emailErr }, "Failed to send verification email after registration");
       }
 
       return reply.status(201).send({

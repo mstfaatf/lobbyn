@@ -40,3 +40,6 @@ jobs:
           UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
           UPSTASH_REDIS_REST_TOKEN: placeholder
           NODE_ENV: test
+          RESEND_API_KEY: re_placeholder
+          RESEND_FROM_EMAIL: noreply@lobbyn.app
+          API_BASE_URL: http://localhost:3000

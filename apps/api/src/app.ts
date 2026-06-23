@@ -9,6 +9,7 @@ import feedRoutes from './routes/feed/index.js';
 import marketplaceRoutes from './routes/marketplace/index.js';
 import mediaRoutes from './routes/media/index.js';
 import notificationsPlugin from './routes/notifications/index.js';
+import profileRoutes from './routes/profile/index.js';
 import ticketsRoutes from './routes/tickets/index.js';
 
 function createLogger() {
@@ -47,6 +48,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(ticketsRoutes);
   await app.register(mediaRoutes);
   await app.register(notificationsPlugin, { prefix: '/v1/notifications' });
+  await app.register(profileRoutes, { prefix: '/v1/profile' });
 
   app.get('/health', async () => ({
     status: 'ok',

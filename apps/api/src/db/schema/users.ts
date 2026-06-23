@@ -20,7 +20,14 @@ export const users = pgTable(
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     fullName: varchar('full_name', { length: 255 }).notNull(),
     avatarUrl: varchar('avatar_url', { length: 500 }),
+    displayName: varchar('display_name', { length: 50 }),
     isActive: boolean('is_active').notNull().default(true),
+    emailVerified: boolean('email_verified').notNull().default(false),
+    emailVerifyToken: varchar('email_verify_token', { length: 255 }),
+    emailVerifyTokenExpiresAt: timestamp('email_verify_token_expires_at', {
+      withTimezone: true,
+    }),
+    deleteRequestedAt: timestamp('delete_requested_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
