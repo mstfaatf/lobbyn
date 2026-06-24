@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './lib/sentry.js';
 
 import './db/client.js';
 import './redis/client.js';

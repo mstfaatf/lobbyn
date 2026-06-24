@@ -20,6 +20,7 @@
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/sensible": "^6.0.4",
     "@neondatabase/serverless": "^1.1.0",
+    "@sentry/node": "^10.59.0",
     "@upstash/redis": "^1.38.0",
     "argon2": "^0.44.0",
     "bullmq": "^5.76.10",

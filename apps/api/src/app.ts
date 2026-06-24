@@ -2,8 +2,10 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
+import Sentry from './lib/sentry.js';
 
+import adminPlugin from './routes/admin/index.js';
 import authRoutes from './routes/auth/index.js';
 import feedRoutes from './routes/feed/index.js';
 import marketplaceRoutes from './routes/marketplace/index.js';
@@ -49,11 +51,18 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(mediaRoutes);
   await app.register(notificationsPlugin, { prefix: '/v1/notifications' });
   await app.register(profileRoutes, { prefix: '/v1/profile' });
+  await app.register(adminPlugin, { prefix: '/v1/admin' });
 
   app.get('/health', async () => ({
     status: 'ok',
     timestamp: new Date().toISOString(),
   }));
+
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
+    Sentry.captureException(error);
+    const statusCode = error.statusCode ?? 500;
+    void reply.status(statusCode).send({ message: error.message });
+  });
 
   return app;
 }

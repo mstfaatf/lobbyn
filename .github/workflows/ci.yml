@@ -43,3 +43,4 @@ jobs:
           RESEND_API_KEY: re_placeholder
           RESEND_FROM_EMAIL: noreply@lobbyn.app
           API_BASE_URL: http://localhost:3000
+          SENTRY_DSN: https://placeholder@sentry.io/0
