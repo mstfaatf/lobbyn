@@ -1,8 +1,10 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import {
+  AnyPgColumn,
   boolean,
   index,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -13,6 +15,15 @@ import {
 
 import { buildings, organizations } from './organizations.js';
 import { users } from './users.js';
+
+export const reactionType = pgEnum('reaction_type', [
+  'like',
+  'heart',
+  'laugh',
+  'wow',
+  'sad',
+  'angry',
+]);
 
 export const posts = pgTable(
   'posts',
@@ -34,6 +45,7 @@ export const posts = pgTable(
     isPinned: boolean('is_pinned').notNull().default(false),
     isLocked: boolean('is_locked').notNull().default(false),
     isDeleted: boolean('is_deleted').notNull().default(false),
+    moderationReason: varchar('moderation_reason', { length: 500 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -66,6 +78,9 @@ export const comments = pgTable(
     authorId: uuid('author_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    parentId: uuid('parent_id').references((): AnyPgColumn => comments.id, {
+      onDelete: 'cascade',
+    }),
     content: text('content').notNull(),
     isDeleted: boolean('is_deleted').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -81,6 +96,7 @@ export const comments = pgTable(
       table.createdAt.asc(),
     ),
     index('comments_building_id_idx').on(table.buildingId),
+    index('comments_parent_id_idx').on(table.parentId),
   ],
 );
 
@@ -97,7 +113,7 @@ export const reactions = pgTable(
     buildingId: uuid('building_id')
       .notNull()
       .references(() => buildings.id, { onDelete: 'cascade' }),
-    type: varchar('type', { length: 20 }).notNull().default('like'),
+    type: reactionType('type').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -3,9 +3,4 @@ dist
 .env
 .DS_Store
 *.tsbuildinfo
-test-login.json
-test-post.json
-test-listing.json
-test-ticket.json
-test-join.json
-test-presign.json
+test-*.json

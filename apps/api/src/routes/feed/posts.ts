@@ -41,10 +41,11 @@ const postIdParamSchema = z.string().uuid();
 
 const createCommentBodySchema = z.object({
   content: z.string().min(1).max(2000),
+  parentId: z.string().uuid().optional(),
 });
 
 const reactBodySchema = z.object({
-  type: z.literal("like"),
+  type: z.enum(['like', 'heart', 'laugh', 'wow', 'sad', 'angry']),
 });
 
 const patchPostBodySchema = z
@@ -52,6 +53,7 @@ const patchPostBodySchema = z
     isPinned: z.boolean().optional(),
     isLocked: z.boolean().optional(),
     isDeleted: z.boolean().optional(),
+    moderationReason: z.string().min(1).max(500).optional(),
   })
   .strict();
 
@@ -379,6 +381,7 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         content: comments.content,
         createdAt: comments.createdAt,
         updatedAt: comments.updatedAt,
+        parentId: comments.parentId,
         authorId: users.id,
         authorFullName: users.fullName,
         authorAvatarUrl: users.avatarUrl,
@@ -390,6 +393,7 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
 
     const commentsPayload = commentRows.map((c) => ({
       id: c.id,
+      parentId: c.parentId,
       content: c.content,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -469,13 +473,28 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         return createError(reply, 403, "This post has been locked");
       }
 
+      const { content, parentId } = parsed.data;
+
+      if (parentId !== undefined) {
+        const [parentComment] = await db
+          .select({ id: comments.id })
+          .from(comments)
+          .where(and(eq(comments.id, parentId), eq(comments.postId, postId)))
+          .limit(1);
+
+        if (parentComment === undefined) {
+          return createError(reply, 400, "Invalid parent comment");
+        }
+      }
+
       const [insertedComment] = await db
         .insert(comments)
         .values({
           postId,
           buildingId: existingPost.buildingId,
           authorId: request.user.id,
-          content: parsed.data.content,
+          content,
+          parentId: parentId ?? null,
         })
         .returning();
 
@@ -641,18 +660,30 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         return createError(reply, 400, "No fields to update");
       }
 
+      const settingToTrue =
+        body.isPinned === true ||
+        body.isLocked === true ||
+        body.isDeleted === true;
+
+      if (settingToTrue && body.moderationReason === undefined) {
+        return createError(reply, 400, "Moderation reason is required");
+      }
+
       const [updated] = await db
         .update(posts)
         .set({
           ...(body.isPinned !== undefined ? { isPinned: body.isPinned } : {}),
           ...(body.isLocked !== undefined ? { isLocked: body.isLocked } : {}),
           ...(body.isDeleted !== undefined ? { isDeleted: body.isDeleted } : {}),
+          ...(body.moderationReason !== undefined
+            ? { moderationReason: body.moderationReason }
+            : {}),
           updatedAt: sql`now()`,
         })
         .where(
           and(eq(posts.id, postId), eq(posts.buildingId, request.user.buildingId)),
         )
-        .returning({ id: posts.id });
+        .returning({ id: posts.id, authorId: posts.authorId });
 
       if (updated === undefined) {
         return createError(reply, 404, "Post not found");
@@ -667,6 +698,22 @@ const feedPostsRoutes: FastifyPluginAsync = async (fastify) => {
         resourceId: postId,
         metadata: body,
       });
+
+      if (
+        body.moderationReason !== undefined &&
+        updated.authorId !== request.user.id
+      ) {
+        await dispatchNotification({
+          userId: updated.authorId,
+          buildingId: request.user.buildingId,
+          orgId: request.user.orgId,
+          type: "post_moderated",
+          title: "Your post was moderated",
+          body: body.moderationReason,
+          resourceType: "post",
+          resourceId: postId,
+        });
+      }
 
       const [row] = await db
         .select({

@@ -22,6 +22,27 @@
       "when": 1779148665966,
       "tag": "0002_fearless_toad",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782938628075,
+      "tag": "0003_public_mad_thinker",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782938725421,
+      "tag": "0004_fuzzy_ser_duncan",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782938975014,
+      "tag": "0005_parallel_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

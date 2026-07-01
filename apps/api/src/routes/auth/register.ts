@@ -1,13 +1,14 @@
 import { randomBytes } from "node:crypto";
 
 import rateLimit from "@fastify/rate-limit";
-import { eq } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
 import { hashPassword } from "../../auth/password.js";
 import { db } from "../../db/client.js";
 import { users } from "../../db/schema/users.js";
+import { generateDisplayName } from "../../lib/display-name.js";
 import { sendVerificationEmail } from "../../lib/email.js";
 
 const registerBodySchema = z.object({
@@ -31,6 +32,25 @@ const registerAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { email, password, fullName } = parsed.data;
 
+      let displayName: string | undefined;
+      for (let i = 0; i < 5; i++) {
+        const candidate = generateDisplayName();
+        const collision = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(ilike(users.displayName, candidate))
+          .limit(1);
+        if (collision.length === 0) {
+          displayName = candidate;
+          break;
+        }
+      }
+      if (displayName === undefined) {
+        displayName =
+          generateDisplayName() +
+          Math.floor(1000 + Math.random() * 9000).toString();
+      }
+
       const existing = await db
         .select({ id: users.id })
         .from(users)
@@ -51,6 +71,7 @@ const registerAuthRoutes: FastifyPluginAsync = async (fastify) => {
           email,
           passwordHash,
           fullName,
+          displayName,
         })
         .returning({
           id: users.id,
